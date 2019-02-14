@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="build-helpers">
+	<description>
+            This file contains common helper targets and is included from build.xml
+    </description>
+
+	<target name="showtime">
+		<tstamp>
+			<format property="currenttime" pattern="yyyy-MM-dd HH:mm:ss Z" />
+		</tstamp>
+		<echo message="Current time is ${currenttime}." />
+	</target>
+
+    <!-- =================================================================== -->
+    <!-- OpenClover 4.2 stuff                                                    -->
+    <!-- =================================================================== -->
+    <target name="declare-task-clover" unless="clover.enabled">
+        <property name="clover.jar" location="${ejbca.home}/lib/ext/openclover-ant/clover.jar"/>
+        <taskdef resource="cloverlib.xml" classpath="${clover.jar}" onerror="ignore"/>
+    </target>
+    <property name="clover.out.dir" location="${ejbca.home}/reports/clover"/>
+    <property name="clover.testresults.dir" location="${ejbca.home}/reports/test"/>
+    <property name="clover.db" location="${clover.out.dir}/clover.db"/>
+    <target name="check.clover" depends="declare-task-clover" unless="clover.enabled">
+        <property environment="env"/>
+        <condition property="clover.enabled">
+            <and>
+                <or>
+                    <isset property="env.ENABLE_CLOVER"/>
+                    <isset property="ENABLE_CLOVER"/>
+                </or>
+                <available classname="com.atlassian.clover.CloverInstr" />
+            </and>
+        </condition>
+    </target>
+    <target name="with.clover" depends="check.clover" if="clover.enabled">
+        <mkdir dir="${clover.out.dir}"/>
+        <clover-setup initstring="${clover.db}">
+            <fileset dir="${ejbca.home}">
+                <exclude name="**/org/apache/**/*.java"/>
+                <exclude name="**/com/novosec/**/*.java"/>
+                <exclude name="**/org/jboss/**/*.java"/>
+                <exclude name="**/org/owasp/**/*.java"/>
+                <exclude name="**/sun/security/**/*.java"/>
+            </fileset>
+            <testsources dir="${ejbca.home}">
+                <testclass name=".*Test"/>
+                <testclass name=".*UnitTest"/>
+            </testsources>
+        </clover-setup>
+    </target>
+    <target name="clover.xml" depends="check.clover" if="clover.enabled">
+        <clover-report initstring="${clover.db}">
+           <current outfile="${clover.out.dir}/clover.xml" title="EJBCA">
+               <format type="xml"/>
+               <testresults dir="${clover.testresults.dir}">
+                   <include name="TEST-*.xml"/>
+               </testresults>
+           </current>
+        </clover-report>
+     </target>
+    <target name="clover.html" depends="check.clover" if="clover.enabled">
+        <clover-report initstring="${clover.db}">
+            <current outfile="${clover.out.dir}/clover_html" title="EJBCA" summary="true">
+                <format type="html"/>
+                <testresults dir="${clover.testresults.dir}">
+                    <include name="TEST-*.xml"/>
+                </testresults>
+            </current>
+        </clover-report>
+    	<echo message="Clover report is available in file://${clover.out.dir}/clover_html/index.html"/>
+     </target>
+    <target name="clover.clean" depends="check.clover" if="clover.enabled">
+        <clover-clean initstring="${clover.db}"/>
+        <delete dir="${clover.out.dir}"/>
+    </target>
+    <!-- End Clover stuff -->
+	
+	<!-- The buildservicemanifest needs ${ejbca-home}/src/java/defaultvalues.properties in order to run. 
+	     This is included in ejbca-common, so if that or ${ejbca-home}/src/java is not on the classpath passed to this macro, this will fail. -->
+	<macrodef name="buildservicemanifest">
+		<attribute name="classpath" />
+		<attribute name="file" />
+		<attribute name="interface" />
+		<element name="buildservicemanifest" implicit="yes" />
+		<sequential>
+			<!-- Enable to see full classpath provided to this call
+			<pathconvert property="buildservicemanifestbuilder.debug.class.path" refid="@{classpath}"/>
+			<echo message="buildservicemanifestbuilder classpath: @{classpath} = ${buildservicemanifestbuilder.debug.class.path}"/>
+			-->
+			<java classname="com.primekey.anttools.ServiceManifestBuilder" fork="true" failonerror="true" >
+				<classpath>
+					<path refid="@{classpath}" />
+					<path refid="lib.jee.classpath"/>
+					<path refid="lib.servicemanifestbuilder.classpath"/>
+				</classpath>
+				<arg value="@{file}" />
+				<arg value="@{interface}" />
+			</java>
+		</sequential>
+	</macrodef>
+</project>
